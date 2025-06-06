@@ -51,4 +51,40 @@ router.post("/login", async (req, res) => {
     }
 });
 
+// Blog post
+router.post("/post", async (req, res) => {
+    const { username, title, content, datetime } = req.body;
+
+    try {
+        const result = await db.query(
+            "INSERT INTO posts (username, title, content, datetime) VALUES ($1, $2, $3, $4)",
+            [username, title, content, datetime]
+        );
+        res.status(201).json({ message: "Post successful" });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ error: "Post failed" });
+    }
+});
+
+// Retrieve ten most recent blog posts
+router.get("/posts", async (req, res) => {
+    const offset = parseInt(req.query.offset || "0", 10)
+    const pageSize = 10;
+
+    try {
+        const result = await db.query(
+            "SELECT * FROM posts ORDER BY datetime DESC LIMIT $1 OFFSET $2",
+            [pageSize + 1, offset]
+        );
+
+        const posts = result.rows.slice(0, pageSize);
+        const areThereMorePosts = result.rows.length > pageSize;
+        res.json({ posts, areThereMorePosts });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to retrieve posts" });
+    }
+});
+
 export default router;
