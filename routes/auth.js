@@ -69,7 +69,7 @@ router.post("/post", async (req, res) => {
 
 // Retrieve ten most recent blog posts
 router.get("/posts", async (req, res) => {
-    const offset = parseInt(req.query.offset || "0", 10)
+    const offset = parseInt(req.query.offset || "0")
     const pageSize = 10;
 
     try {
@@ -84,6 +84,44 @@ router.get("/posts", async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Failed to retrieve posts" });
+    }
+});
+
+// Post a comment
+router.post("/comment", async (req, res) => {
+    const { username, content, datetime, postID } = req.body;
+
+    try {
+        const result = await db.query(
+            "INSERT INTO comments (username, content, datetime, postID) VALUES ($1, $2, $3, $4)",
+            [username, content, datetime, postID]
+        );
+        res.status(201).json({ message: "Comment successful" });
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ error: "Comment failed" });
+    }
+});
+
+
+// Retrieve all comments on a post
+router.get("/comments", async (req, res) => {
+    const offset = parseInt(req.query.offset || "0");
+    const commentAmount = parseInt(req.query.pageSize || "10");
+    const postID = parseInt(req.query.postID);
+
+    try {
+        const result = await db.query(
+            "SELECT * FROM comments WHERE postID = $1 ORDER BY datetime DESC LIMIT $2 OFFSET $3",
+            [postID, commentAmount + 1, offset]
+        );
+
+        const comments = result.rows.slice(0, commentAmount);
+        const areThereMoreComments = result.rows.length > commentAmount;
+        res.json({ comments, areThereMoreComments });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error:"Failed to retrieve comments" });
     }
 });
 
