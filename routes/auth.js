@@ -51,7 +51,7 @@ router.post("/login", async (req, res) => {
     }
 });
 
-// Blog post
+// Post a blog post
 router.post("/post", async (req, res) => {
     const { username, title, content, datetime } = req.body;
 
@@ -84,6 +84,37 @@ router.get("/posts", async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Failed to retrieve posts" });
+    }
+});
+
+// Delete a blog post
+router.delete("/post/delete", async (req, res) => {
+    const postID = req.query.postID;
+    try {
+        const result = await db.query(
+            "DELETE FROM posts WHERE id = $1",
+            [postID]
+        )
+        res.status(201).json({ message: `Post with ID ${postID} deleted` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to delete post" })
+    }
+})
+
+// Edit a blog post
+router.put("/post/edit", async (req, res) => {
+    const postID = req.query.postID;
+    const { title, content } = req.body;
+    try {
+        const result = await db.query(
+            "UPDATE posts SET title = $1, content = $2 WHERE id = $3",
+            [title, content, postID]
+        );
+        res.status(201).json({ message: `Post with ID ${postID} updated` });
+    } catch {
+        console.error(err);
+        res.status(500).json({ error: "Failed to edit post" });
     }
 });
 
@@ -122,6 +153,37 @@ router.get("/comments", async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error:"Failed to retrieve comments" });
+    }
+});
+
+// Delete a comment
+router.delete("/comment/delete", async (req, res) => {
+    const commentID = req.query.commentID;
+    try {
+        const result = await db.query(
+            "DELETE FROM comments WHERE id = $1",
+            [commentID]
+        )
+        res.status(201).json({ message: `Comment with ID ${commentID} deleted` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to delete comment" })
+    }
+})
+
+// Edit a comment
+router.put("/comment/edit", async (req, res) => {
+    const commentID = req.query.commentID;
+    const { content } = req.body;
+    try {
+        const result = await db.query(
+            "UPDATE comments SET content = $1 WHERE id = $2",
+            [ content, commentID]
+        );
+        res.status(201).json({ message: `Comment with ID ${commentID} updated` });
+    } catch {
+        console.error(err);
+        res.status(500).json({ error: "Failed to edit comment" });
     }
 });
 
