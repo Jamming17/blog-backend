@@ -7,6 +7,25 @@ import db from "../db.js"
 dotenv.config();
 const router = express.Router();
 
+function authenticateJWT(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (authHeader) {
+        const token = authHeader.split(" ")[1];
+
+        jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+            if (err) {
+                return res.sendStatus(403);
+            }
+
+            req.user = user;
+            next();
+        });
+    } else {
+        res.sendStatus(401);
+    }
+}
+
 // Register user
 router.post("/register", async (req, res) => {
     const { username, password, admin } = req.body;
@@ -52,7 +71,10 @@ router.post("/login", async (req, res) => {
 });
 
 // Post a blog post
-router.post("/post", async (req, res) => {
+router.post("/post", authenticateJWT, async (req, res) => {
+    if (!req.user.admin) {
+        return res.status(403).json({ error: "Not authorised" });
+    }
     const { username, title, content, datetime } = req.body;
 
     try {
@@ -88,22 +110,32 @@ router.get("/posts", async (req, res) => {
 });
 
 // Delete a blog post
-router.delete("/post/delete", async (req, res) => {
+router.delete("/post/delete", authenticateJWT, async (req, res) => {
+    if (!req.user.admin) {
+        return res.status(403).json({ error: "Not authorised" });
+    }
     const postID = req.query.postID;
     try {
         const result = await db.query(
             "DELETE FROM posts WHERE id = $1",
             [postID]
         )
-        res.status(201).json({ message: `Post with ID ${postID} deleted` });
+        const result2 = await db.query(
+            "DELETE FROM comments WHERE postID = $1",
+            [postID]
+        )
+        res.status(201).json({ message: `Post with ID ${postID} and comments deleted` });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: "Failed to delete post" })
     }
-})
+});
 
 // Edit a blog post
-router.put("/post/edit", async (req, res) => {
+router.put("/post/edit", authenticateJWT, async (req, res) => {
+    if (!req.user.admin) {
+        return res.status(403).json({ error: "Not authorised" });
+    }
     const postID = req.query.postID;
     const { title, content } = req.body;
     try {
@@ -119,15 +151,17 @@ router.put("/post/edit", async (req, res) => {
 });
 
 // Post a comment
-router.post("/comment", async (req, res) => {
-    const { username, content, datetime, postID } = req.body;
+router.post("/comment", authenticateJWT, async (req, res) => {
+    const username = req.user.username;
+    const { content, datetime, postID } = req.body;
 
     try {
         const result = await db.query(
-            "INSERT INTO comments (username, content, datetime, postID) VALUES ($1, $2, $3, $4)",
+            "INSERT INTO comments (username, content, datetime, postID) VALUES ($1, $2, $3, $4) RETURNING id",
             [username, content, datetime, postID]
         );
-        res.status(201).json({ message: "Comment successful" });
+        const commentID = result.rows[0].id;
+        res.status(201).json({ message: "Comment successful", commentID });
     } catch (err) {
         console.error(err);
         res.status(400).json({ error: "Comment failed" });
@@ -157,10 +191,21 @@ router.get("/comments", async (req, res) => {
 });
 
 // Delete a comment
-router.delete("/comment/delete", async (req, res) => {
+router.delete("/comment/delete", authenticateJWT, async (req, res) => {
     const commentID = req.query.commentID;
     try {
         const result = await db.query(
+            "SELECT username FROM comments WHERE id = $1",
+            [commentID]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Comment not found" });
+        }
+        if (req.user.username !== result.rows[0].username && !req.user.admin) {
+            return res.status(403).json({ error: "Not authorised to delete comment" });
+        }
+
+        await db.query(
             "DELETE FROM comments WHERE id = $1",
             [commentID]
         )
@@ -169,14 +214,25 @@ router.delete("/comment/delete", async (req, res) => {
         console.error(err);
         res.status(500).json({ error: "Failed to delete comment" })
     }
-})
+});
 
 // Edit a comment
-router.put("/comment/edit", async (req, res) => {
+router.put("/comment/edit", authenticateJWT, async (req, res) => {
     const commentID = req.query.commentID;
     const { content } = req.body;
     try {
         const result = await db.query(
+            "SELECT username FROM comments WHERE id = $1",
+            [commentID]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Comment not found" });
+        }
+        if (req.user.username !== result.rows[0].username && !req.user.admin) {
+            return res.status(403).json({ error: "Not authorised to edit comment" });
+        }
+        
+        await db.query(
             "UPDATE comments SET content = $1 WHERE id = $2",
             [ content, commentID]
         );
