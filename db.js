@@ -1,5 +1,6 @@
 import pkg from "pg";
 import dotenv from "dotenv";
+import { lookup } from "dns";
 
 dotenv.config();
 const { Pool } = pkg;
