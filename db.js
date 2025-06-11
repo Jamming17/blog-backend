@@ -9,6 +9,9 @@ const pool = new Pool({
     ssl: {
         rejectUnauthorized: false,
     },
+    lookup: (hostname, options, callback) => {
+        return lookup(hostname, { family: 4 }, callback);
+    }
 });
 
 export default pool;
