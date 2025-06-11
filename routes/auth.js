@@ -185,7 +185,7 @@ router.get("/comments", async (req, res) => {
         const areThereMoreComments = result.rows.length > commentAmount;
         res.json({ comments, areThereMoreComments });
     } catch (err) {
-        console.error(err);
+        console.error("DB ERROR: ", err);
         res.status(500).json({ error:"Failed to retrieve comments" });
     }
 });
